@@ -37,7 +37,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo "Installing system dependencies with apt..."
         sudo apt-get update
         sudo apt-get install -y \
-            libgl1-mesa-glx \
+            libgl1-mesa-dev \
             libglib2.0-0 \
             libsm6 \
             libxext6 \
