@@ -104,7 +104,7 @@ jobs:
         zip -r "../dist-final/${{ matrix.asset_name }}" MidiArt-Pro/
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
         path: dist-final/${{ matrix.asset_name }}
@@ -120,7 +120,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
 
     - name: Get version
       id: get_version
@@ -132,13 +132,12 @@ jobs:
         fi
 
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.get_version.outputs.VERSION }}
-        release_name: MidiArt-Pro ${{ steps.get_version.outputs.VERSION }}
+        name: MidiArt-Pro ${{ steps.get_version.outputs.VERSION }}
         body: |
           ## MidiArt-Pro ${{ steps.get_version.outputs.VERSION }}
           
@@ -162,33 +161,7 @@ jobs:
           Built with PyInstaller and GitHub Actions
         draft: false
         prerelease: false
-
-    - name: Upload Windows Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./MidiArt-Pro-Windows/MidiArt-Pro-Windows.zip
-        asset_name: MidiArt-Pro-Windows.zip
-        asset_content_type: application/zip
-
-    - name: Upload macOS Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./MidiArt-Pro-macOS/MidiArt-Pro-macOS.zip
-        asset_name: MidiArt-Pro-macOS.zip
-        asset_content_type: application/zip
-
-    - name: Upload Linux Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./MidiArt-Pro-Linux/MidiArt-Pro-Linux.zip
-        asset_name: MidiArt-Pro-Linux.zip
-        asset_content_type: application/zip
+        files: |
+          ./MidiArt-Pro-Windows/MidiArt-Pro-Windows.zip
+          ./MidiArt-Pro-macOS/MidiArt-Pro-macOS.zip
+          ./MidiArt-Pro-Linux/MidiArt-Pro-Linux.zip
