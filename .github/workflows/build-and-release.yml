@@ -1,0 +1,194 @@
+name: Build MidiArt-Pro
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: MidiArt-Pro-Windows
+            asset_name: MidiArt-Pro-Windows.zip
+          - os: macos-latest
+            artifact_name: MidiArt-Pro-macOS
+            asset_name: MidiArt-Pro-macOS.zip
+          - os: ubuntu-latest
+            artifact_name: MidiArt-Pro-Linux
+            asset_name: MidiArt-Pro-Linux.zip
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgl1-mesa-glx \
+          libglib2.0-0 \
+          libsm6 \
+          libxext6 \
+          libxrender-dev \
+          libgomp1 \
+          libfontconfig1 \
+          libice6 \
+          libxrandr2 \
+          libxss1 \
+          libxtst6 \
+          libxi6 \
+          libxcomposite1 \
+          libxdamage1 \
+          libxfixes3 \
+          libxcursor1 \
+          libasound2-dev \
+          portaudio19-dev \
+          ffmpeg
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install portaudio
+        brew install ffmpeg
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller MidiArt-Pro.spec
+
+    - name: Create distribution directory
+      run: |
+        mkdir -p dist-final
+
+    - name: Package Windows build
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive -Path "dist/MidiArt-Pro/*" -DestinationPath "dist-final/${{ matrix.asset_name }}"
+      shell: powershell
+
+    - name: Package macOS build
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd dist
+        zip -r "../dist-final/${{ matrix.asset_name }}" MidiArt-Pro.app/
+
+    - name: Package Linux build
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd dist
+        zip -r "../dist-final/${{ matrix.asset_name }}" MidiArt-Pro/
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: dist-final/${{ matrix.asset_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Get version
+      id: get_version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        release_name: MidiArt-Pro ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## MidiArt-Pro ${{ steps.get_version.outputs.VERSION }}
+          
+          ### Downloads
+          - **Windows**: Download `MidiArt-Pro-Windows.zip`
+          - **macOS**: Download `MidiArt-Pro-macOS.zip`
+          - **Linux**: Download `MidiArt-Pro-Linux.zip`
+          
+          ### Installation
+          1. Download the appropriate file for your operating system
+          2. Extract the archive
+          3. Run the executable file
+          
+          ### Features
+          - Powerful MIDI music visualization
+          - Customizable visual effects
+          - Multiple color themes
+          - Export to video format
+          
+          ---
+          Built with PyInstaller and GitHub Actions
+        draft: false
+        prerelease: false
+
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./MidiArt-Pro-Windows/MidiArt-Pro-Windows.zip
+        asset_name: MidiArt-Pro-Windows.zip
+        asset_content_type: application/zip
+
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./MidiArt-Pro-macOS/MidiArt-Pro-macOS.zip
+        asset_name: MidiArt-Pro-macOS.zip
+        asset_content_type: application/zip
+
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./MidiArt-Pro-Linux/MidiArt-Pro-Linux.zip
+        asset_name: MidiArt-Pro-Linux.zip
+        asset_content_type: application/zip
